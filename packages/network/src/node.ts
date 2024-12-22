@@ -117,9 +117,7 @@ export class DRPNetworkNode {
 		this._node = await createLibp2p({
 			privateKey: this._privateKey,
 			addresses: {
-				listen: this._config?.addresses
-					? this._config.addresses
-					: ["/webrtc", "/p2p-circuit"],
+				listen: this._config?.addresses ? this._config.addresses : ["/webrtc"],
 			},
 			connectionEncrypters: [noise()],
 			connectionGater: {
@@ -133,6 +131,7 @@ export class DRPNetworkNode {
 			streamMuxers: [yamux()],
 			transports: [
 				circuitRelayTransport({
+					discoverRelays: 2,
 					reservationConcurrency: 1,
 				}),
 				webRTC(),
