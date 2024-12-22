@@ -1,2 +1,2 @@
 #!/bin/bash
-exec yarn cli "$@"
+exec pnpm cli "$@"
