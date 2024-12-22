@@ -8,6 +8,7 @@ const run = async () => {
 	program.parse(process.argv);
 	const opts = program.opts();
 	const config: DRPNodeConfig | undefined = loadConfig(opts.config);
+	console.log("config", config);
 
 	const node = new DRPNode(config);
 	await node.start();
