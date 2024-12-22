@@ -142,6 +142,7 @@ export class DRPNetworkNode {
 			],
 		});
 
+		log.info("running on:", this._node.getMultiaddrs());
 		if (!this._config?.bootstrap) {
 			for (const addr of this._config?.bootstrap_peers || []) {
 				try {
