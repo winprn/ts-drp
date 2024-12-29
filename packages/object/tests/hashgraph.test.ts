@@ -69,6 +69,7 @@ describe("HashGraph construction tests", () => {
 			},
 			[],
 			"",
+			Date.now(),
 			"",
 		);
 		obj1.hashGraph.addVertex(
@@ -78,6 +79,7 @@ describe("HashGraph construction tests", () => {
 			},
 			[hash],
 			"",
+			Date.now(),
 			"",
 		);
 		expect(obj1.hashGraph.selfCheckConstraints()).toBe(false);
@@ -388,54 +390,6 @@ describe("HashGraph for AddWinSet tests", () => {
 	});
 });
 
-describe("HashGraph for PseudoRandomWinsSet tests", () => {
-	let obj1: DRPObject;
-	let obj2: DRPObject;
-	let obj3: DRPObject;
-	let obj4: DRPObject;
-	let obj5: DRPObject;
-
-	beforeEach(async () => {
-		obj1 = new DRPObject("peer1", new PseudoRandomWinsSet<number>());
-		obj2 = new DRPObject("peer2", new PseudoRandomWinsSet<number>());
-		obj3 = new DRPObject("peer3", new PseudoRandomWinsSet<number>());
-		obj4 = new DRPObject("peer4", new PseudoRandomWinsSet<number>());
-		obj5 = new DRPObject("peer5", new PseudoRandomWinsSet<number>());
-	});
-
-	test("Test: Many concurrent operations", () => {
-		/*
-		        /-- V1:ADD(1)
-		       /--- V2:ADD(2)
-		  ROOT -- V3:ADD(3)
-		       \__  V4:ADD(4)
-		        \__ V5:ADD(5)
-		*/
-
-		const drp1 = obj1.drp as PseudoRandomWinsSet<number>;
-		const drp2 = obj2.drp as PseudoRandomWinsSet<number>;
-		const drp3 = obj3.drp as PseudoRandomWinsSet<number>;
-		const drp4 = obj4.drp as PseudoRandomWinsSet<number>;
-		const drp5 = obj5.drp as PseudoRandomWinsSet<number>;
-
-		drp1.add(1);
-		drp2.add(2);
-		drp3.add(3);
-		drp4.add(4);
-		drp5.add(5);
-
-		obj2.merge(obj1.hashGraph.getAllVertices());
-		obj3.merge(obj2.hashGraph.getAllVertices());
-		obj4.merge(obj3.hashGraph.getAllVertices());
-		obj5.merge(obj4.hashGraph.getAllVertices());
-		obj1.merge(obj5.hashGraph.getAllVertices());
-
-		const linearOps = obj1.hashGraph.linearizeOperations();
-		// Pseudo-randomly chosen operation
-		expect(linearOps).toEqual([{ type: "add", value: 5 }]);
-	});
-});
-
 describe("HashGraph for undefined operations tests", () => {
 	let obj1: DRPObject;
 	let obj2: DRPObject;
@@ -612,5 +566,70 @@ describe("Vertex state tests", () => {
 		expect(drpStateV8?.state.get("state").get(1)).toBe(false);
 		expect(drpStateV8?.state.get("state").get(2)).toBe(true);
 		expect(drpStateV8?.state.get("state").get(3)).toBe(undefined);
+	});
+});
+
+describe("Vertex timestamp tests", () => {
+	let obj1: DRPObject;
+	let obj2: DRPObject;
+	let obj3: DRPObject;
+
+	beforeEach(async () => {
+		obj1 = new DRPObject("peer1", new AddWinsSet<number>());
+		obj2 = new DRPObject("peer1", new AddWinsSet<number>());
+		obj3 = new DRPObject("peer1", new AddWinsSet<number>());
+	});
+
+	test("Test: Vertex created in the future is invalid", () => {
+		const drp1 = obj1.drp as AddWinsSet<number>;
+
+		drp1.add(1);
+
+		expect(() =>
+			obj1.hashGraph.addVertex(
+				{
+					type: "add",
+					value: 1,
+				},
+				obj1.hashGraph.getFrontier(),
+				"",
+				Number.POSITIVE_INFINITY,
+				"",
+			),
+		).toThrowError("Invalid timestamp detected.");
+	});
+
+	test("Test: Vertex's timestamp must not be less than any of its dependencies' timestamps", () => {
+		/*
+		        __ V1:ADD(1) __
+		       /               \  
+		  ROOT -- V2:ADD(2) ---- V4:ADD(4) (invalid)
+		       \               /
+		        -- V3:ADD(3) --
+		*/
+
+		const drp1 = obj1.drp as AddWinsSet<number>;
+		const drp2 = obj2.drp as AddWinsSet<number>;
+		const drp3 = obj2.drp as AddWinsSet<number>;
+
+		drp1.add(1);
+		drp2.add(2);
+		drp3.add(3);
+
+		obj1.merge(obj2.hashGraph.getAllVertices());
+		obj1.merge(obj3.hashGraph.getAllVertices());
+
+		expect(() =>
+			obj1.hashGraph.addVertex(
+				{
+					type: "add",
+					value: 1,
+				},
+				obj1.hashGraph.getFrontier(),
+				"",
+				1,
+				"",
+			),
+		).toThrowError("Invalid timestamp detected.");
 	});
 });

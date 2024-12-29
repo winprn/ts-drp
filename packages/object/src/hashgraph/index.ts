@@ -59,12 +59,13 @@ export class HashGraph {
 	/*
 	computeHash(
 		"",
-		{ type: OperationType.NOP },
+		{ type: OperationType.NOP, value: null },
 		[],
-	)
+		-1,
+	);
 	*/
 	static readonly rootHash: Hash =
-		"a65c9cbd875fd3d602adb69a90adb98c4e2c3f26bdf3a2bf597f3548971f2c93";
+		"425d2b1f5243dbf23c685078034b06fbfa71dc31dcce30f614e28023f140ff13";
 	private arePredecessorsFresh = false;
 	private reachablePredecessors: Map<Hash, BitSet> = new Map();
 	private topoSortedIndex: Map<Hash, number> = new Map();
@@ -89,6 +90,7 @@ export class HashGraph {
 				value: null,
 			},
 			dependencies: [],
+			timestamp: -1,
 			signature: "",
 		};
 		this.vertices.set(HashGraph.rootHash, rootVertex);
@@ -101,13 +103,15 @@ export class HashGraph {
 
 	addToFrontier(operation: Operation): Vertex {
 		const deps = this.getFrontier();
-		const hash = computeHash(this.peerId, operation, deps);
+		const currentTimestamp = Date.now();
+		const hash = computeHash(this.peerId, operation, deps, currentTimestamp);
 
 		const vertex: Vertex = {
 			hash,
 			peerId: this.peerId,
 			operation: operation ?? { type: OperationType.NOP },
 			dependencies: deps,
+			timestamp: currentTimestamp,
 			signature: "",
 		};
 
@@ -151,17 +155,29 @@ export class HashGraph {
 		operation: Operation,
 		deps: Hash[],
 		peerId: string,
+		timestamp: number,
 		signature: string,
 	): Hash {
-		const hash = computeHash(peerId, operation, deps);
+		const hash = computeHash(peerId, operation, deps, timestamp);
 		if (this.vertices.has(hash)) {
 			return hash; // Vertex already exists
 		}
 
-		if (
-			!deps.every((dep) => this.forwardEdges.has(dep) || this.vertices.has(dep))
-		) {
-			throw new Error("Invalid dependency detected.");
+		for (const dep of deps) {
+			const vertex = this.vertices.get(dep);
+			if (vertex === undefined) {
+				throw new Error("Invalid dependency detected.");
+			}
+			if (vertex.timestamp > timestamp) {
+				// Vertex's timestamp must not be less than any of its dependencies' timestamps
+				throw new Error("Invalid timestamp detected.");
+			}
+		}
+
+		const currentTimestamp = Date.now();
+		if (timestamp > currentTimestamp) {
+			// Vertex created in the future is invalid
+			throw new Error("Invalid timestamp detected.");
 		}
 
 		const vertex: Vertex = {
@@ -169,6 +185,7 @@ export class HashGraph {
 			peerId,
 			operation,
 			dependencies: deps,
+			timestamp,
 			signature,
 		};
 		this.vertices.set(hash, vertex);
@@ -502,12 +519,13 @@ export class HashGraph {
 	}
 }
 
-function computeHash<T>(
+function computeHash(
 	peerId: string,
 	operation: Operation,
 	deps: Hash[],
+	timestamp: number,
 ): Hash {
-	const serialized = JSON.stringify({ operation, deps, peerId });
+	const serialized = JSON.stringify({ operation, deps, peerId, timestamp });
 	const hash = crypto.createHash("sha256").update(serialized).digest("hex");
 	return hash;
 }
