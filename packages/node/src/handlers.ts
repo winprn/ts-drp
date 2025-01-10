@@ -194,18 +194,22 @@ export function drpObjectChangesHandler(
 			break;
 		case "callFn": {
 			node.objectStore.put(obj.id, obj);
-			// send vertices to the pubsub group
-			const message = NetworkPb.Message.create({
-				sender: node.networkNode.peerId,
-				type: NetworkPb.MessageType.MESSAGE_TYPE_UPDATE,
-				data: NetworkPb.Update.encode(
-					NetworkPb.Update.create({
-						objectId: obj.id,
-						vertices: vertices,
-					}),
-				).finish(),
+
+			signGeneratedVertices(node, vertices).then(() => {
+				// send vertices to the pubsub group
+				const message = NetworkPb.Message.create({
+					sender: node.networkNode.peerId,
+					type: NetworkPb.MessageType.MESSAGE_TYPE_UPDATE,
+					data: NetworkPb.Update.encode(
+						NetworkPb.Update.create({
+							objectId: obj.id,
+							vertices: vertices,
+						}),
+					).finish(),
+				});
+				node.networkNode.broadcastMessage(obj.id, message);
 			});
-			node.networkNode.broadcastMessage(obj.id, message);
+
 			break;
 		}
 		default:
