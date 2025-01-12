@@ -32,8 +32,8 @@ import { webTransport } from "@libp2p/webtransport";
 import { multiaddr } from "@multiformats/multiaddr";
 import { Logger, type LoggerOptions } from "@ts-drp/logger";
 import { type Libp2p, createLibp2p } from "libp2p";
-import { toString as uint8ArrayToString } from "uint8arrays";
 import { fromString as uint8ArrayFromString } from "uint8arrays/from-string";
+import { toString as uint8ArrayToString } from "uint8arrays/to-string";
 import { Message } from "./proto/drp/network/v1/messages_pb.js";
 import { uint8ArrayToStream } from "./stream.js";
 
@@ -306,13 +306,12 @@ export class DRPNetworkNode {
 		this._node?.handle(protocol, handler);
 	}
 
-	async sign(data: string): Promise<string> {
+	async sign(data: string): Promise<Uint8Array> {
 		if (!this._privateKey) {
-			log.error("::signVertexOperation: Private key not found");
-			return "";
+			throw new Error("Private key not initialized");
 		}
 
 		const signature = await this._privateKey.sign(uint8ArrayFromString(data));
-		return uint8ArrayToString(signature, "base64");
+		return signature;
 	}
 }
