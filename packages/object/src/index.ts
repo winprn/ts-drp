@@ -177,7 +177,7 @@ export class DRPObject implements IDRPObject {
 		};
 	}
 
-	callFn(
+	private callFn(
 		fn: string,
 		// biome-ignore lint: value can't be unknown because of protobuf
 		args: any,
@@ -191,7 +191,12 @@ export class DRPObject implements IDRPObject {
 			preOperationDRP = this._computeDRP(this.hashGraph.getFrontier());
 		}
 		const drp = cloneDeep(preOperationDRP);
-		this._applyOperation(drp, { opType: fn, value: args, drpType });
+		try {
+			this._applyOperation(drp, { opType: fn, value: args, drpType });
+		} catch (e) {
+			log.error(`::drpObject::callFn: ${e}`);
+			return;
+		}
 
 		let stateChanged = false;
 		for (const key of Object.keys(preOperationDRP)) {
@@ -334,7 +339,11 @@ export class DRPObject implements IDRPObject {
 			throw new Error(`${opType} is not a function`);
 		}
 
-		target[methodName](...value);
+		try {
+			target[methodName](...value);
+		} catch (e) {
+			throw new Error(`Error while applying operation ${opType}: ${e}`);
+		}
 	}
 
 	// compute the DRP based on all dependencies of the current vertex using partial linearization
