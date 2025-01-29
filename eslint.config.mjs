@@ -7,7 +7,7 @@ import vitest from "eslint-plugin-vitest";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+const config = tseslint.config(
 	{
 		ignores: [
 			"**/.env",
@@ -85,3 +85,5 @@ export default tseslint.config(
 		},
 	}
 );
+
+export default config;
