@@ -45,6 +45,7 @@ const config = tseslint.config(
 			parserOptions: {
 				ecmaVersion: 2021,
 				sourceType: "module",
+				tsconfigRootDir: import.meta.dirname,
 				project: "./tsconfig.json",
 			},
 			globals: {
