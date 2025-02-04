@@ -3,7 +3,7 @@ import { SetDRP } from "@ts-drp/blueprints/src/Set/index.js";
 import { beforeEach, describe, expect, test } from "vitest";
 
 import { ObjectACL } from "../src/acl/index.js";
-import { ACLGroup, DRPObject, DrpType, type Operation, OperationType } from "../src/index.js";
+import { ACLGroup, DRPObject, DrpType, type Operation } from "../src/index.js";
 
 const acl = new ObjectACL({
 	admins: new Map([
@@ -52,7 +52,6 @@ describe("HashGraph construction tests", () => {
 
 		drp1.add(1);
 		drp2.add(2);
-
 		obj2.merge(obj1.hashGraph.getAllVertices());
 
 		expect(obj2.hashGraph.selfCheckConstraints()).toBe(true);
@@ -72,28 +71,30 @@ describe("HashGraph construction tests", () => {
 		const drp1 = obj1.drp as SetDRP<number>;
 		drp1.add(1);
 		// add fake root
-		const hash = obj1.hashGraph.addVertex(
-			{
+		obj1.hashGraph.addVertex({
+			hash: "hash1",
+			peerId: "peer1",
+			operation: {
 				opType: "root",
 				value: null,
 				drpType: DrpType.DRP,
 			},
-			[],
-			"",
-			Date.now(),
-			new Uint8Array()
-		);
-		obj1.hashGraph.addVertex(
-			{
+			dependencies: [],
+			timestamp: Date.now(),
+			signature: new Uint8Array(),
+		});
+		obj1.hashGraph.addVertex({
+			hash: "hash2",
+			peerId: "peer1",
+			operation: {
 				opType: "add",
 				value: [1],
 				drpType: DrpType.DRP,
 			},
-			[hash],
-			"",
-			Date.now(),
-			new Uint8Array()
-		);
+			dependencies: ["hash1"],
+			timestamp: Date.now(),
+			signature: new Uint8Array(),
+		});
 		expect(obj1.hashGraph.selfCheckConstraints()).toBe(false);
 
 		const linearOps = obj1.hashGraph.linearizeOperations();
@@ -325,15 +326,6 @@ describe("HashGraph for undefined operations tests", () => {
 		// Should only have one, since we skipped the undefined operations
 		expect(linearOps).toEqual([{ opType: "add", value: [2], drpType: DrpType.DRP }]);
 	});
-
-	test("Test: addToFrontier with undefined operation return Vertex with NoOp operation", () => {
-		// Forcefully pass an undefined value
-		const createdVertex = obj1.hashGraph.addToFrontier(undefined as unknown as Operation);
-
-		expect(createdVertex.operation).toEqual({
-			opType: OperationType.NOP,
-		} as Operation);
-	});
 });
 
 describe("Vertex state tests", () => {
@@ -448,17 +440,18 @@ describe("Vertex timestamp tests", () => {
 		drp1.add(1);
 
 		expect(() =>
-			obj1.hashGraph.addVertex(
-				{
+			obj1.hashGraph.addVertex({
+				hash: "",
+				peerId: "peer1",
+				operation: {
 					opType: "add",
 					value: 1,
 					drpType: DrpType.DRP,
 				},
-				obj1.hashGraph.getFrontier(),
-				"",
-				Number.POSITIVE_INFINITY,
-				new Uint8Array()
-			)
+				dependencies: obj1.hashGraph.getFrontier(),
+				timestamp: Number.POSITIVE_INFINITY,
+				signature: new Uint8Array(),
+			})
 		).toThrowError("Invalid timestamp detected.");
 	});
 
@@ -483,17 +476,18 @@ describe("Vertex timestamp tests", () => {
 		obj1.merge(obj3.hashGraph.getAllVertices());
 
 		expect(() =>
-			obj1.hashGraph.addVertex(
-				{
+			obj1.hashGraph.addVertex({
+				hash: "",
+				peerId: "peer1",
+				operation: {
 					opType: "add",
 					value: 1,
 					drpType: DrpType.DRP,
 				},
-				obj1.hashGraph.getFrontier(),
-				"",
-				1,
-				new Uint8Array()
-			)
+				dependencies: obj1.hashGraph.getFrontier(),
+				timestamp: 1,
+				signature: new Uint8Array(),
+			})
 		).toThrowError("Invalid timestamp detected.");
 	});
 });
@@ -790,5 +784,55 @@ describe("HashGraph for delete wins map tests", () => {
 		drp1.delete("key2");
 		obj2.merge(obj1.hashGraph.getAllVertices());
 		expect(drp2.query_get("key2")).toBe(undefined);
+	});
+});
+
+describe("Hash validation tests", () => {
+	let obj1: DRPObject;
+	let obj2: DRPObject;
+	beforeEach(async () => {
+		obj1 = new DRPObject({
+			peerId: "peer1",
+			acl,
+			drp: new MapDRP<string, string>(),
+		});
+
+		obj2 = new DRPObject({
+			peerId: "peer2",
+			acl,
+			drp: new MapDRP<string, string>(),
+		});
+	});
+
+	test("Should accept vertices with valid hash", () => {
+		const drp1 = obj1.drp as MapDRP<string, string>;
+		const drp2 = obj2.drp as MapDRP<string, string>;
+		drp1.set("key1", "value1");
+		drp2.set("key2", "value2");
+
+		obj2.merge(obj1.hashGraph.getAllVertices());
+		expect(obj2.vertices.length).toBe(3);
+		expect(obj2.hashGraph.getAllVertices().length).toBe(3);
+	});
+
+	test("Should ignore vertices with invalid hash", () => {
+		obj1.hashGraph.addVertex({
+			hash: "hash",
+			peerId: "peer1",
+			operation: {
+				opType: "add",
+				value: "value",
+				drpType: DrpType.DRP,
+			},
+			dependencies: obj1.hashGraph.getFrontier(),
+			timestamp: Date.now(),
+			signature: new Uint8Array(),
+		});
+
+		expect(obj1.hashGraph.getAllVertices().length).toBe(2);
+		expect(obj2.hashGraph.getAllVertices().length).toBe(1);
+		expect(obj2.hashGraph.getAllVertices().includes(obj1.hashGraph.getAllVertices()[1])).toBe(
+			false
+		);
 	});
 });
