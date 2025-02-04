@@ -543,15 +543,10 @@ describe("Writer permission tests", () => {
 		const acl2 = obj2.acl as ObjectACL;
 
 		drp1.add(1);
-		acl1.grant(
-			"peer1",
-			"peer2",
-			{
-				ed25519PublicKey: "pubKey2",
-				blsPublicKey: "pubKey2",
-			},
-			ACLGroup.Writer
-		);
+		acl1.grant("peer1", "peer2", ACLGroup.Writer, {
+			ed25519PublicKey: "pubKey2",
+			blsPublicKey: "pubKey2",
+		});
 		expect(acl1.query_isAdmin("peer1")).toBe(true);
 
 		obj2.merge(obj1.hashGraph.getAllVertices());
@@ -576,24 +571,14 @@ describe("Writer permission tests", () => {
 		const drp3 = obj3.drp as SetDRP<number>;
 		const acl1 = obj1.acl as ObjectACL;
 
-		acl1.grant(
-			"peer1",
-			"peer2",
-			{
-				ed25519PublicKey: "pubKey2",
-				blsPublicKey: "pubKey2",
-			},
-			ACLGroup.Writer
-		);
-		acl1.grant(
-			"peer1",
-			"peer3",
-			{
-				ed25519PublicKey: "pubKey3",
-				blsPublicKey: "pubKey3",
-			},
-			ACLGroup.Writer
-		);
+		acl1.grant("peer1", "peer2", ACLGroup.Writer, {
+			ed25519PublicKey: "pubKey2",
+			blsPublicKey: "pubKey2",
+		});
+		acl1.grant("peer1", "peer3", ACLGroup.Writer, {
+			ed25519PublicKey: "pubKey3",
+			blsPublicKey: "pubKey3",
+		});
 		obj2.merge(obj1.hashGraph.getAllVertices());
 		obj3.merge(obj1.hashGraph.getAllVertices());
 
@@ -617,6 +602,17 @@ describe("Writer permission tests", () => {
 		obj1.merge(obj3.hashGraph.getAllVertices());
 		expect(drp1.query_has(3)).toBe(false);
 		expect(drp1.query_has(4)).toBe(true);
+	});
+
+	test("Should grant admin permission to a peer", () => {
+		const acl1 = obj1.acl as ObjectACL;
+		const newAdminPeer1 = "newAdminPeer1";
+		const newAdmin = {
+			ed25519PublicKey: "newAdmin",
+			blsPublicKey: "newAdmin",
+		};
+		acl1.grant("peer1", "newAdminPeer1", ACLGroup.Admin, newAdmin);
+		expect(acl1.query_isAdmin(newAdminPeer1)).toBe(true);
 	});
 });
 
